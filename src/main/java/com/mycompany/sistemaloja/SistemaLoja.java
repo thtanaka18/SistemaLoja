@@ -3,6 +3,7 @@ package com.mycompany.sistemaloja;
 import enums.Categoria;
 import enums.Status;
 import exceptions.EstoqueInsuficienteException;
+import exceptions.PedidoInvalidoException;
 import models.Pedido;
 import models.Produto;
 import java.time.LocalDate;
@@ -13,6 +14,7 @@ import models.ItemPedido;
 import java.util.stream.Collectors;
 import java.util.Optional;
 import java.util.Comparator;
+import descontos.*;
 
 public class SistemaLoja {
 
@@ -93,7 +95,35 @@ public class SistemaLoja {
         List<Pedido> pedidos = new ArrayList<>(List.of(
                 ped1, ped2, ped3, ped4, ped5, ped6, ped7, ped8, ped9, ped10, ped11, ped12));
         
+        try{
+            System.out.println("Tentando adicionar no pedido mais notebooks do que ha no estoque:");
+            Pedido ped13 = new Pedido (13, "Thiago", Status.CRIADO, new ArrayList<>(), LocalDate.of(2026,11,21));
+            ped13.adicionarItem(notebook, 500);
+        }
+        catch(EstoqueInsuficienteException e){
+            System.out.println(e.getMessage()+"\n");
+        }
         
+        try{
+            System.out.println("Tentando adicionar produto a um pedido ja enviado");
+            ped2.adicionarItem(notebook, 1);
+        }
+        catch(PedidoInvalidoException e){
+            System.out.println(e.getMessage()+"\n");
+        }
+        
+        System.out.println("Testando descontos: ");
+        double totalOriginal = ped11.getTotal();
+        Desconto percentual = new DescontoPercentual(10);
+        Desconto fixo = new DescontoFixo(50);
+        Desconto fixoMaior = new DescontoFixo(10000);
+        
+        System.out.printf("Total original: R$%.2f%n", totalOriginal);
+        System.out.printf("Total com 10%% de desconto: R$%.2f%n", percentual.aplicar(totalOriginal));
+        System.out.printf("Com desconto fixo de R$50: R$%.2f%n", fixo.aplicar(totalOriginal));
+        System.out.printf("Com R$10000 de desconto fixo: R$%.2f%n", fixoMaior.aplicar(totalOriginal));
+        System.out.println("\n");
+                
         //1. Liste os nomes dos clientes que têm pelo menos um pedido PAGO, sem repetição e em ordem alfabética.
         List<String> pedidoPago = pedidos.stream()
                 .filter(p -> p.getStatus() == Status.PAGO)
@@ -101,26 +131,30 @@ public class SistemaLoja {
                 .distinct()
                 .sorted()
                 .toList();
-        System.out.println(pedidoPago);
+        System.out.println("Item 1: clientes com pedido PAGO: " + pedidoPago + "\n");
 
         //2.Calcule o faturamento total (soma dos totais) dos pedidos que não foram CANCELADO.
         double faturamentoTotal = pedidos.stream()
                 .filter(p -> p.getStatus() != Status.CANCELADO)
                 .mapToDouble(p -> p.getTotal())
                 .sum();
-        System.out.printf("R$%.2f%n", faturamentoTotal);
+        System.out.printf("Item 2: Faturamento total, excluindo os pedidos CANCELADOS: R$%.2f%n\n", faturamentoTotal);
 
         //3.Agrupe os pedidos por cliente (Map<String, List<Pedido>>).
         Map<String, List<Pedido>> porCliente = pedidos.stream()
                 .collect(Collectors.groupingBy(Pedido::getCliente));
+        System.out.println("Item 3: Pedidos agrupados por cliente: ");
         porCliente.forEach((cliente, lista) -> System.out.println(cliente + ": " + lista.size() + " pedidos"));
+        System.out.println("\n");
 
         //4. Gere um Map<String, Double> com o total gasto por cliente.
         Map<String, Double> gastoPorCliente = pedidos.stream()
                 .collect(Collectors.groupingBy(
                         Pedido::getCliente,
                         Collectors.summingDouble(Pedido::getTotal)));
+        System.out.println("Item 4: Total gasto por cliente: ");
         gastoPorCliente.forEach((cliente, total) -> System.out.printf("%s: R$ %.2f%n", cliente, total));
+        System.out.println("\n");
 
         //5. Descubra qual é o produto mais vendido, em quantidade total, considerando todos os pedidos.
         Map<String, Integer> qtdPorProduto = pedidos.stream()
@@ -130,8 +164,10 @@ public class SistemaLoja {
                         Collectors.summingInt(ItemPedido::getQuantidade)));
         Optional<Map.Entry<String, Integer>> maisVendido = qtdPorProduto.entrySet().stream()
                 .max(Map.Entry.comparingByValue());
+        System.out.println("Item 5: Produto mais vendido: ");
         maisVendido.ifPresent(e
                 -> System.out.println(e.getKey() + ": " + e.getValue() + " unidades"));
+        System.out.println("\n");
 
         //6. Calcule o ticket médio (média do total) dos pedidos de cada categoria de produto.
         Map<Categoria, Double> ticketPorCategoria = pedidos.stream()
@@ -142,17 +178,19 @@ public class SistemaLoja {
                 .collect(Collectors.groupingBy(
                         Map.Entry::getKey,
                         Collectors.averagingDouble(e -> e.getValue().getTotal())));
-
+        System.out.println("Item 6: Ticket medio de cada categoria: ");
         ticketPorCategoria.forEach((categoria, media)
                 -> System.out.printf("%s: R$ %.2f%n", categoria, media));
+        System.out.println("\n");
 
         //7. Mostre os 3 pedidos de maior valor, em ordem decrescente.
         List<Pedido> top3 = pedidos.stream()
-                .sorted(Comparator.comparingDouble(Pedido::getTotal))
+                .sorted(Comparator.comparingDouble(Pedido::getTotal).reversed())
                 .limit(3)
                 .toList();
-
+        System.out.println("Item 7: Top 3 pedidos de maior valor: ");
         top3.forEach(p -> System.out.printf("Pedido %d (%s): R$ %.2f%n", p.getId(), p.getCliente(), p.getTotal()));
+        System.out.println("\n");
 
         //8.Verifique se existe algum pedido com mais de 5 itens (anyMatch) e se todos os pedidos têm total maior que zero (allMatch).
         boolean temPedidoGrande = pedidos.stream()
