@@ -9,7 +9,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import models.ItemPedido;
 import java.util.stream.Collectors;
+import java.util.Optional;
+import java.util.Comparator;
 
 public class SistemaLoja {
 
@@ -116,7 +119,51 @@ System.out.println(pedidoPago);
                                                   Pedido::getCliente,
                                                   Collectors.summingDouble(Pedido::getTotal)));
     gastoPorCliente.forEach((cliente, total) -> System.out.printf("%s: R$ %.2f%n", cliente, total));
+    
+    //5. Descubra qual é o produto mais vendido, em quantidade total, considerando todos os pedidos.
+   Map<String, Integer> qtdPorProduto = pedidos.stream()
+        .flatMap(p -> p.getLista().stream())
+        .collect(Collectors.groupingBy(
+                i -> i.getProduto().getNome(),
+                Collectors.summingInt(ItemPedido::getQuantidade)));
+   Optional<Map.Entry<String, Integer>> maisVendido = qtdPorProduto.entrySet().stream()
+        .max(Map.Entry.comparingByValue());
+   maisVendido.ifPresent(e ->
+        System.out.println(e.getKey() + ": " + e.getValue() + " unidades"));
+   
+   //6. Calcule o ticket médio (média do total) dos pedidos de cada categoria de produto.
+   Map<Categoria, Double> ticketPorCategoria = pedidos.stream()
+        .flatMap(p -> p.getLista().stream()
+                .map(i -> i.getProduto().getCategoria())
+                .distinct()
+                .map(c -> Map.entry(c, p)))
+        .collect(Collectors.groupingBy(
+                Map.Entry::getKey,
+                Collectors.averagingDouble(e -> e.getValue().getTotal())));
+
+ticketPorCategoria.forEach((categoria, media) ->
+        System.out.printf("%s: R$ %.2f%n", categoria, media));
+
+   //7. Mostre os 3 pedidos de maior valor, em ordem decrescente.
+   List<Pedido> top3 = pedidos.stream()
+                       .sorted(Comparator.comparingDouble(Pedido::getTotal))
+                       .limit(3)
+                       .toList();
+   
+   top3.forEach(p -> System.out.printf("Pedido %d (%s): R$ %.2f%n", p.getId(), p.getCliente(), p.getTotal()));
+           
+    //8.Verifique se existe algum pedido com mais de 5 itens (anyMatch) e se todos os pedidos têm total maior que zero (allMatch).
+    boolean temPedidoGrande = pedidos.stream()
+                              .anyMatch(p -> p.getLista().size() > 5);
+                              
+    
+    boolean todosPositivos = pedidos.stream()
+                             .allMatch(p -> p.getTotal() > 0);
+    
+    System.out.println("Existe pedido com mais de 5 itens? " + temPedidoGrande);
+    System.out.println("Todos os pedidos têm total > 0? " + todosPositivos);
     }
+    
     
     
     
